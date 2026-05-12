@@ -1213,8 +1213,8 @@ function startClient() {
 
 /* ── MENU ACTIONS ───────────────────────────── */
 createBtn.onclick = () => {
-  nickname = nicknameInput.value.trim();
-  if (!nickname) { nicknameInput.focus(); return; }
+  nickname = nicknameEl.value.trim();
+  if (!nickname) { nicknameEl.focus(); return; }
   myColor = pickColor();
   roomId  = genRoomId();
 
@@ -1226,9 +1226,9 @@ createBtn.onclick = () => {
 };
 
 joinBtn.onclick = () => {
-  nickname = nicknameInput.value.trim();
+  nickname = nicknameEl.value.trim();
   roomId   = roomInputEl.value.trim().toUpperCase();
-  if (!nickname) { nicknameInput.focus(); return; }
+  if (!nickname) { nicknameEl.focus(); return; }
   if (!roomId)   { roomInputEl.focus(); return; }
   myColor  = pickColor();
 
