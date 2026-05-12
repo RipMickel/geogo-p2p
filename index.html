@@ -86,11 +86,13 @@
       top: 12px;
       left: 12px;
       z-index: 999;
-      background: rgba(0,0,0,0.7);
+      background: rgba(0,0,0,0.75);
       color: white;
-      padding: 10px 14px;
-      border-radius: 12px;
+      padding: 12px 16px;
+      border-radius: 14px;
       font-size: 14px;
+      min-width: 220px;
+      line-height: 1.8;
     }
 
     .room-box {
@@ -102,9 +104,66 @@
       font-size: 14px;
     }
 
+    .exit-btn {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 9999;
+      background: #ef4444;
+      color: white;
+      border: none;
+      padding: 12px 18px;
+      border-radius: 14px;
+      cursor: pointer;
+      font-weight: bold;
+      display: none;
+    }
+
+    .player-wrapper {
+      position: relative;
+      width: 24px;
+      height: 24px;
+    }
+
+    .pulse {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      border-radius: 999px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0.5;
+      animation: pulseAnim 2s infinite;
+    }
+
+    .dot {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border: 3px solid white;
+      box-shadow: 0 0 15px rgba(255,255,255,0.8);
+    }
+
+    @keyframes pulseAnim {
+      0% {
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 0.8;
+      }
+
+      100% {
+        transform: translate(-50%, -50%) scale(2);
+        opacity: 0;
+      }
+    }
+
     .leaflet-popup-content {
-      font-size: 14px;
       text-align: center;
+      font-size: 14px;
     }
   </style>
 </head>
@@ -127,9 +186,15 @@
   </div>
 </div>
 
-<div class="status" id="status">
-  Connecting...
+<div class="status">
+  <div><b>Role:</b> <span id="roleText">-</span></div>
+  <div><b>Host:</b> <span id="hostText">-</span></div>
+  <div><b>Room:</b> <span id="roomText">-</span></div>
 </div>
+
+<button class="exit-btn" id="exitBtn">
+  Exit
+</button>
 
 <div id="map"></div>
 
@@ -140,9 +205,9 @@
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
 <script>
-  // ======================
+  // =========================
   // MAP
-  // ======================
+  // =========================
 
   const map = L.map('map').setView([14.5995, 120.9842], 18);
 
@@ -150,44 +215,52 @@
     attribution: '&copy; OpenStreetMap'
   }).addTo(map);
 
-  // ======================
+  // =========================
   // UI
-  // ======================
+  // =========================
 
   const menu = document.getElementById('menu');
   const nicknameInput = document.getElementById('nickname');
   const roomInput = document.getElementById('room');
   const createBtn = document.getElementById('createBtn');
   const joinBtn = document.getElementById('joinBtn');
-  const statusEl = document.getElementById('status');
   const roomBox = document.getElementById('roomBox');
+  const exitBtn = document.getElementById('exitBtn');
 
-  // ======================
-  // PLAYER
-  // ======================
+  const roleText = document.getElementById('roleText');
+  const hostText = document.getElementById('hostText');
+  const roomText = document.getElementById('roomText');
+
+  // =========================
+  // PLAYER VARIABLES
+  // =========================
 
   let nickname = "";
   let myMarker = null;
   let peer = null;
   let roomId = null;
   let watchId = null;
+  let isHost = false;
 
   const connections = [];
   const players = {};
 
-  // ======================
+  let myColor = randomColor();
+
+  // =========================
   // CREATE ROOM
-  // ======================
+  // =========================
 
   createBtn.onclick = () => {
     nickname = nicknameInput.value.trim();
 
     if (!nickname) {
-      alert("Enter nickname");
+      alert("Please enter a nickname");
       return;
     }
 
     roomId = generateRoomId();
+    isHost = true;
 
     roomBox.innerHTML = `
       <b>Room Created</b><br><br>
@@ -198,9 +271,9 @@
     startHost();
   };
 
-  // ======================
+  // =========================
   // JOIN ROOM
-  // ======================
+  // =========================
 
   joinBtn.onclick = () => {
     nickname = nicknameInput.value.trim();
@@ -214,16 +287,28 @@
     startClient();
   };
 
-  // ======================
+  // =========================
+  // EXIT BUTTON
+  // =========================
+
+  exitBtn.onclick = () => {
+    location.reload();
+  };
+
+  // =========================
   // HOST
-  // ======================
+  // =========================
 
   function startHost() {
     peer = new Peer(roomId);
 
     peer.on('open', () => {
       menu.style.display = 'none';
-      statusEl.innerText = `Hosting Room: ${roomId}`;
+      exitBtn.style.display = 'block';
+
+      roleText.innerText = "HOST 👑";
+      hostText.innerText = nickname;
+      roomText.innerText = roomId;
 
       startGPS();
     });
@@ -233,36 +318,50 @@
     });
   }
 
-  // ======================
+  // =========================
   // CLIENT
-  // ======================
+  // =========================
 
   function startClient() {
     peer = new Peer();
 
-    peer.on('open', (id) => {
+    peer.on('open', () => {
       const conn = peer.connect(roomId);
 
       conn.on('open', () => {
         setupConnection(conn);
 
         menu.style.display = 'none';
-        statusEl.innerText = `Joined Room: ${roomId}`;
+        exitBtn.style.display = 'block';
+
+        roleText.innerText = "PLAYER 👤";
+        roomText.innerText = roomId;
 
         startGPS();
       });
     });
   }
 
-  // ======================
-  // CONNECTION SETUP
-  // ======================
+  // =========================
+  // CONNECTION
+  // =========================
 
   function setupConnection(conn) {
     connections.push(conn);
 
     conn.on('data', (data) => {
+
+      // Show host name to joined users
+      if (data.host) {
+        hostText.innerText = data.nickname;
+      }
+
       updatePlayer(data);
+
+      // Host rebroadcasts to everyone
+      if (isHost) {
+        broadcast(data);
+      }
     });
 
     conn.on('close', () => {
@@ -270,99 +369,185 @@
     });
   }
 
-  // ======================
-  // GPS TRACKING
-  // ======================
+  // =========================
+  // GPS
+  // =========================
 
   function startGPS() {
+
     if (!navigator.geolocation) {
       alert("Geolocation unsupported");
       return;
     }
 
     watchId = navigator.geolocation.watchPosition(
+
       (position) => {
+
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
 
         updateMe(lat, lng);
 
-        broadcast({
+        const payload = {
           id: peer.id,
           nickname,
           lat,
-          lng
-        });
+          lng,
+          color: myColor,
+          host: isHost
+        };
+
+        broadcast(payload);
       },
+
       (err) => {
         console.error(err);
         alert("Location permission denied");
       },
+
       {
         enableHighAccuracy: true,
         maximumAge: 0,
         timeout: 5000
       }
+
     );
   }
 
-  // ======================
-  // UPDATE MY MARKER
-  // ======================
+  // =========================
+  // PLAYER ICON
+  // =========================
+
+  function createPlayerIcon(color) {
+
+    return L.divIcon({
+      className: '',
+      html: `
+        <div class="player-wrapper">
+          <div class="pulse" style="background:${color}"></div>
+          <div class="dot" style="background:${color}"></div>
+        </div>
+      `,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    });
+
+  }
+
+  // =========================
+  // UPDATE ME
+  // =========================
 
   function updateMe(lat, lng) {
+
     map.setView([lat, lng]);
 
+    const icon = createPlayerIcon(myColor);
+
     if (!myMarker) {
-      myMarker = L.marker([lat, lng])
+
+      myMarker = L.marker([lat, lng], { icon })
         .addTo(map)
-        .bindPopup(`🟢 You (${nickname})`);
+        .bindPopup(`
+          🟢 You<br>
+          ${nickname}<br>
+          ${isHost ? '👑 Host' : '👤 Player'}
+        `);
+
     } else {
+
       myMarker.setLatLng([lat, lng]);
+
     }
   }
 
-  // ======================
+  // =========================
   // UPDATE OTHER PLAYERS
-  // ======================
+  // =========================
 
   function updatePlayer(data) {
+
     if (data.id === peer.id) return;
 
+    const icon = createPlayerIcon(data.color);
+
     if (!players[data.id]) {
-      players[data.id] = L.marker([data.lat, data.lng])
-        .addTo(map)
-        .bindPopup(`👤 ${data.nickname}`);
+
+      players[data.id] = L.marker(
+        [data.lat, data.lng],
+        { icon }
+      )
+      .addTo(map)
+      .bindPopup(`
+        ${data.host ? '👑 HOST' : '👤 PLAYER'}<br>
+        ${data.nickname}
+      `);
+
     } else {
+
       players[data.id].setLatLng([data.lat, data.lng]);
+
     }
   }
 
-  // ======================
+  // =========================
   // BROADCAST
-  // ======================
+  // =========================
 
   function broadcast(data) {
+
     connections.forEach(conn => {
+
       if (conn.open) {
         conn.send(data);
       }
+
     });
+
   }
 
-  // ======================
-  // UTIL
-  // ======================
+  // =========================
+  // RANDOM ROOM
+  // =========================
 
   function generateRoomId() {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    return Math.random()
+      .toString(36)
+      .substring(2, 8)
+      .toUpperCase();
+
   }
 
-  // ======================
+  // =========================
+  // RANDOM PLAYER COLOR
+  // =========================
+
+  function randomColor() {
+
+    const colors = [
+      '#3B82F6',
+      '#EF4444',
+      '#10B981',
+      '#F59E0B',
+      '#8B5CF6',
+      '#EC4899',
+      '#06B6D4'
+    ];
+
+    return colors[
+      Math.floor(Math.random() * colors.length)
+    ];
+
+  }
+
+  // =========================
   // CLEANUP
-  // ======================
+  // =========================
 
   window.addEventListener('beforeunload', () => {
+
     if (watchId) {
       navigator.geolocation.clearWatch(watchId);
     }
@@ -370,7 +555,9 @@
     if (peer) {
       peer.destroy();
     }
+
   });
+
 </script>
 
 </body>
