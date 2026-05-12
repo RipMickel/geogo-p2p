@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GeoGO Multiplayer</title>
+
+  <!-- Leaflet -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #111827;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    .menu {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(to bottom, #0f172a, #111827);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+
+    .card {
+      width: 320px;
+      background: white;
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+    }
+
+    .card h1 {
+      margin-bottom: 12px;
+      font-size: 28px;
+      color: #111827;
+    }
+
+    .card p {
+      margin-bottom: 20px;
+      color: #555;
+    }
+
+    .card input {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid #ccc;
+      margin-bottom: 14px;
+      font-size: 16px;
+    }
+
+    .card button {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: none;
+      background: #2563eb;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+
+    .status {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 999;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+    }
+
+    .room-box {
+      margin-top: 14px;
+      background: #f3f4f6;
+      padding: 12px;
+      border-radius: 12px;
+      word-break: break-word;
+      font-size: 14px;
+    }
+
+    .leaflet-popup-content {
+      font-size: 14px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<div class="menu" id="menu">
+  <div class="card">
+    <h1>GeoGO</h1>
+    <p>Pokémon GO style multiplayer map</p>
+
+    <input id="nickname" placeholder="Nickname" maxlength="20" />
+    <input id="room" placeholder="Room ID (optional)" />
+
+    <button id="createBtn">Create Room</button>
+    <button id="joinBtn">Join Room</button>
+
+    <div class="room-box" id="roomBox">
+      No room created yet.
+    </div>
+  </div>
+</div>
+
+<div class="status" id="status">
+  Connecting...
+</div>
+
+<div id="map"></div>
+
+<!-- Leaflet -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- PeerJS -->
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+<script>
+  // ======================
+  // MAP
+  // ======================
+
+  const map = L.map('map').setView([14.5995, 120.9842], 18);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+
+  // ======================
+  // UI
+  // ======================
+
+  const menu = document.getElementById('menu');
+  const nicknameInput = document.getElementById('nickname');
+  const roomInput = document.getElementById('room');
+  const createBtn = document.getElementById('createBtn');
+  const joinBtn = document.getElementById('joinBtn');
+  const statusEl = document.getElementById('status');
+  const roomBox = document.getElementById('roomBox');
+
+  // ======================
+  // PLAYER
+  // ======================
+
+  let nickname = "";
+  let myMarker = null;
+  let peer = null;
+  let roomId = null;
+  let watchId = null;
+
+  const connections = [];
+  const players = {};
+
+  // ======================
+  // CREATE ROOM
+  // ======================
+
+  createBtn.onclick = () => {
+    nickname = nicknameInput.value.trim();
+
+    if (!nickname) {
+      alert("Enter nickname");
+      return;
+    }
+
+    roomId = generateRoomId();
+
+    roomBox.innerHTML = `
+      <b>Room Created</b><br><br>
+      Share this Room ID:<br><br>
+      <b>${roomId}</b>
+    `;
+
+    startHost();
+  };
+
+  // ======================
+  // JOIN ROOM
+  // ======================
+
+  joinBtn.onclick = () => {
+    nickname = nicknameInput.value.trim();
+    roomId = roomInput.value.trim();
+
+    if (!nickname || !roomId) {
+      alert("Enter nickname and room ID");
+      return;
+    }
+
+    startClient();
+  };
+
+  // ======================
+  // HOST
+  // ======================
+
+  function startHost() {
+    peer = new Peer(roomId);
+
+    peer.on('open', () => {
+      menu.style.display = 'none';
+      statusEl.innerText = `Hosting Room: ${roomId}`;
+
+      startGPS();
+    });
+
+    peer.on('connection', (conn) => {
+      setupConnection(conn);
+    });
+  }
+
+  // ======================
+  // CLIENT
+  // ======================
+
+  function startClient() {
+    peer = new Peer();
+
+    peer.on('open', (id) => {
+      const conn = peer.connect(roomId);
+
+      conn.on('open', () => {
+        setupConnection(conn);
+
+        menu.style.display = 'none';
+        statusEl.innerText = `Joined Room: ${roomId}`;
+
+        startGPS();
+      });
+    });
+  }
+
+  // ======================
+  // CONNECTION SETUP
+  // ======================
+
+  function setupConnection(conn) {
+    connections.push(conn);
+
+    conn.on('data', (data) => {
+      updatePlayer(data);
+    });
+
+    conn.on('close', () => {
+      console.log('Disconnected');
+    });
+  }
+
+  // ======================
+  // GPS TRACKING
+  // ======================
+
+  function startGPS() {
+    if (!navigator.geolocation) {
+      alert("Geolocation unsupported");
+      return;
+    }
+
+    watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+
+        updateMe(lat, lng);
+
+        broadcast({
+          id: peer.id,
+          nickname,
+          lat,
+          lng
+        });
+      },
+      (err) => {
+        console.error(err);
+        alert("Location permission denied");
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 5000
+      }
+    );
+  }
+
+  // ======================
+  // UPDATE MY MARKER
+  // ======================
+
+  function updateMe(lat, lng) {
+    map.setView([lat, lng]);
+
+    if (!myMarker) {
+      myMarker = L.marker([lat, lng])
+        .addTo(map)
+        .bindPopup(`🟢 You (${nickname})`);
+    } else {
+      myMarker.setLatLng([lat, lng]);
+    }
+  }
+
+  // ======================
+  // UPDATE OTHER PLAYERS
+  // ======================
+
+  function updatePlayer(data) {
+    if (data.id === peer.id) return;
+
+    if (!players[data.id]) {
+      players[data.id] = L.marker([data.lat, data.lng])
+        .addTo(map)
+        .bindPopup(`👤 ${data.nickname}`);
+    } else {
+      players[data.id].setLatLng([data.lat, data.lng]);
+    }
+  }
+
+  // ======================
+  // BROADCAST
+  // ======================
+
+  function broadcast(data) {
+    connections.forEach(conn => {
+      if (conn.open) {
+        conn.send(data);
+      }
+    });
+  }
+
+  // ======================
+  // UTIL
+  // ======================
+
+  function generateRoomId() {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+  }
+
+  // ======================
+  // CLEANUP
+  // ======================
+
+  window.addEventListener('beforeunload', () => {
+    if (watchId) {
+      navigator.geolocation.clearWatch(watchId);
+    }
+
+    if (peer) {
+      peer.destroy();
+    }
+  });
+</script>
+
+</body>
+</html>
