@@ -2,563 +2,1263 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>GeoGO Multiplayer</title>
-
-  <!-- Leaflet -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <title>GeoGO — Catch the World</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: Arial, sans-serif;
+    :root {
+      --bg: #0b0f1a;
+      --surface: #131929;
+      --surface2: #1a2236;
+      --border: rgba(255,255,255,0.08);
+      --accent: #4ade80;
+      --accent2: #60a5fa;
+      --accent3: #f472b6;
+      --text: #f0f4ff;
+      --muted: #8899bb;
+      --danger: #f87171;
+      --host-color: #fbbf24;
+      --radius: 18px;
+      --radius-sm: 10px;
     }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     html, body {
-      width: 100%;
-      height: 100%;
+      width: 100%; height: 100%;
       overflow: hidden;
-      background: #111827;
+      background: var(--bg);
+      font-family: 'Nunito', sans-serif;
+      color: var(--text);
     }
 
+    /* ── MAP ─────────────────────────────────────── */
     #map {
-      width: 100%;
-      height: 100%;
+      width: 100%; height: 100%;
+      position: fixed; inset: 0;
+      z-index: 0;
     }
 
-    .menu {
-      position: fixed;
-      inset: 0;
-      background: linear-gradient(to bottom, #0f172a, #111827);
+    /* ── MENU ────────────────────────────────────── */
+    #menu {
+      position: fixed; inset: 0;
+      z-index: 9999;
       display: flex;
-      justify-content: center;
       align-items: center;
-      z-index: 9999;
+      justify-content: center;
+      background: radial-gradient(ellipse at 60% 40%, #0d1f3c 0%, #050810 100%);
     }
 
-    .card {
-      width: 320px;
-      background: white;
-      border-radius: 20px;
-      padding: 24px;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+    .stars {
+      position: absolute; inset: 0;
+      background-image:
+        radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 80% 10%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 50% 60%, rgba(255,255,255,0.3) 0%, transparent 100%),
+        radial-gradient(1px 1px at 10% 80%, rgba(255,255,255,0.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 90% 70%, rgba(255,255,255,0.5) 0%, transparent 100%),
+        radial-gradient(2px 2px at 35% 15%, rgba(255,255,255,0.6) 0%, transparent 100%),
+        radial-gradient(1px 1px at 70% 85%, rgba(255,255,255,0.3) 0%, transparent 100%);
+      pointer-events: none;
     }
 
-    .card h1 {
+    .menu-card {
+      position: relative;
+      width: 340px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      padding: 32px 28px;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04) inset;
+      animation: slideUp 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(40px) scale(0.95); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .logo-icon {
+      font-size: 48px;
+      display: block;
+      margin-bottom: 4px;
+      animation: bounce 2s ease-in-out infinite;
+    }
+
+    @keyframes bounce {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    .logo h1 {
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 60%, var(--accent3) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .logo p {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 20px 0;
+    }
+
+    .field {
       margin-bottom: 12px;
-      font-size: 28px;
-      color: #111827;
     }
 
-    .card p {
-      margin-bottom: 20px;
-      color: #555;
+    .field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
     }
 
-    .card input {
+    .field input {
       width: 100%;
+      padding: 13px 16px;
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'Nunito', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .field input:focus {
+      border-color: var(--accent2);
+    }
+
+    .field input::placeholder { color: var(--muted); font-weight: 400; }
+
+    .btn-row { display: flex; gap: 10px; margin-top: 4px; }
+
+    .btn {
+      flex: 1;
       padding: 14px;
-      border-radius: 12px;
-      border: 1px solid #ccc;
-      margin-bottom: 14px;
-      font-size: 16px;
-    }
-
-    .card button {
-      width: 100%;
-      padding: 14px;
-      border-radius: 12px;
+      border-radius: var(--radius-sm);
       border: none;
-      background: #2563eb;
-      color: white;
-      font-size: 16px;
+      font-family: 'Nunito', sans-serif;
+      font-size: 14px;
+      font-weight: 800;
       cursor: pointer;
-      margin-bottom: 10px;
+      transition: transform 0.12s, box-shadow 0.12s;
+      letter-spacing: 0.02em;
     }
 
-    .status {
+    .btn:active { transform: scale(0.96); }
+
+    .btn-create {
+      background: linear-gradient(135deg, var(--accent) 0%, #22c55e 100%);
+      color: #052e10;
+      box-shadow: 0 4px 20px rgba(74,222,128,0.35);
+    }
+
+    .btn-create:hover { box-shadow: 0 6px 28px rgba(74,222,128,0.5); }
+
+    .btn-join {
+      background: linear-gradient(135deg, var(--accent2) 0%, #3b82f6 100%);
+      color: #051533;
+      box-shadow: 0 4px 20px rgba(96,165,250,0.3);
+    }
+
+    .btn-join:hover { box-shadow: 0 6px 28px rgba(96,165,250,0.45); }
+
+    .room-display {
+      margin-top: 16px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.7;
+      word-break: break-all;
+    }
+
+    .room-display .room-id {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.12em;
+      display: block;
+      margin-top: 4px;
+    }
+
+    /* ── HUD PANELS ──────────────────────────────── */
+    .hud {
       position: fixed;
-      top: 82px;
-      left: 12px;
-      z-index: 999;
-      background: rgba(0,0,0,0.75);
-      color: white;
-      padding: 12px 16px;
-      border-radius: 14px;
-      font-size: 14px;
-      min-width: 220px;
-      line-height: 1.8;
+      z-index: 900;
+      pointer-events: none;
     }
 
-    .room-box {
-      margin-top: 14px;
-      background: #f3f4f6;
-      padding: 12px;
-      border-radius: 12px;
-      word-break: break-word;
-      font-size: 14px;
+    .hud * { pointer-events: auto; }
+
+    /* Top-left: room info */
+    #hud-info {
+      top: 12px; left: 12px;
+      background: rgba(11,15,26,0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      min-width: 180px;
+      font-size: 13px;
+      line-height: 1.9;
     }
 
-    .exit-btn {
-      position: fixed;
-      top: 12px;
-      right: 12px;
-      z-index: 9999;
-      background: #ef4444;
-      color: white;
+    #hud-info .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+    }
+
+    .badge-host { background: var(--host-color); color: #1a0a00; }
+    .badge-player { background: var(--accent2); color: #020c1b; }
+
+    #hud-info .info-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    #hud-info .info-label { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+    #hud-info .info-val { font-weight: 700; }
+
+    /* Top-right: exit */
+    #hud-exit {
+      top: 12px; right: 12px;
+    }
+
+    #exitBtn {
+      background: rgba(248,113,113,0.15);
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      padding: 10px 20px;
+      border-radius: var(--radius-sm);
+      font-family: 'Nunito', sans-serif;
+      font-weight: 800;
+      font-size: 13px;
+      cursor: pointer;
+      letter-spacing: 0.04em;
+      transition: background 0.15s;
+    }
+
+    #exitBtn:hover { background: rgba(248,113,113,0.28); }
+
+    /* Bottom: chat */
+    #hud-chat {
+      bottom: 12px; left: 12px;
+      width: min(320px, calc(100vw - 24px));
+    }
+
+    .chat-box {
+      background: rgba(11,15,26,0.88);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-header {
+      padding: 10px 14px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .chat-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: blink 1.5s ease-in-out infinite; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    #chatMessages {
+      height: 160px;
+      overflow-y: auto;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.1) transparent;
+    }
+
+    .chat-msg {
+      font-size: 13px;
+      line-height: 1.5;
+      animation: msgIn 0.2s ease both;
+    }
+
+    @keyframes msgIn {
+      from { opacity: 0; transform: translateX(-6px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    .chat-msg .msg-name { font-weight: 800; }
+    .chat-msg.system { color: var(--muted); font-style: italic; font-size: 12px; }
+
+    .chat-input-row {
+      display: flex;
+      gap: 0;
+      border-top: 1px solid var(--border);
+    }
+
+    #chatInput {
+      flex: 1;
+      background: transparent;
       border: none;
-      padding: 12px 18px;
-      border-radius: 14px;
-      cursor: pointer;
-      font-weight: bold;
-      display: none;
+      padding: 11px 14px;
+      color: var(--text);
+      font-family: 'Nunito', sans-serif;
+      font-size: 13px;
+      outline: none;
     }
 
-    .player-wrapper {
+    #chatInput::placeholder { color: var(--muted); }
+
+    #chatSend {
+      background: var(--accent2);
+      border: none;
+      color: #020c1b;
+      padding: 0 16px;
+      font-family: 'Nunito', sans-serif;
+      font-weight: 800;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    #chatSend:hover { background: #93c5fd; }
+
+    /* Bottom-right: notifications */
+    #hud-notify {
+      bottom: 12px; right: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-end;
+    }
+
+    .notify {
+      background: rgba(11,15,26,0.92);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      animation: notifyIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both,
+                 notifyOut 0.3s ease forwards 3.5s;
+      max-width: 220px;
+    }
+
+    @keyframes notifyIn {
+      from { opacity: 0; transform: translateX(20px) scale(0.9); }
+      to   { opacity: 1; transform: translateX(0) scale(1); }
+    }
+
+    @keyframes notifyOut {
+      to { opacity: 0; transform: translateX(20px) scale(0.9); }
+    }
+
+    /* ── PLAYER MARKERS ──────────────────────────── */
+    .player-icon-wrapper {
       position: relative;
       width: 24px;
       height: 24px;
+      cursor: pointer;
     }
 
-    .pulse {
+    .player-pulse {
       position: absolute;
-      width: 60px;
-      height: 60px;
-      border-radius: 999px;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      opacity: 0.5;
-      animation: pulseAnim 2s infinite;
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0.4);
+      opacity: 0.7;
+      animation: playerPulse 2s ease-out infinite;
     }
 
-    .dot {
+    .player-dot {
       position: absolute;
-      width: 20px;
-      height: 20px;
-      border-radius: 999px;
-      top: 50%;
-      left: 50%;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      border: 3px solid white;
-      box-shadow: 0 0 15px rgba(255,255,255,0.8);
+      border: 3px solid rgba(255,255,255,0.9);
+      box-shadow: 0 0 12px rgba(255,255,255,0.6);
     }
 
-    @keyframes pulseAnim {
-      0% {
-        transform: translate(-50%, -50%) scale(0.5);
-        opacity: 0.8;
-      }
-
-      100% {
-        transform: translate(-50%, -50%) scale(2);
-        opacity: 0;
-      }
+    .player-crown {
+      position: absolute;
+      font-size: 14px;
+      top: -18px; left: 50%;
+      transform: translateX(-50%);
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6));
+      animation: crownFloat 2s ease-in-out infinite;
     }
+
+    @keyframes crownFloat {
+      0%,100% { transform: translateX(-50%) translateY(0); }
+      50%      { transform: translateX(-50%) translateY(-3px); }
+    }
+
+    @keyframes playerPulse {
+      0%   { transform: translate(-50%,-50%) scale(0.4); opacity: 0.7; }
+      100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0; }
+    }
+
+    /* ── ITEM MARKERS ────────────────────────────── */
+    .item-icon-wrapper {
+      position: relative;
+      width: 32px; height: 32px;
+      cursor: pointer;
+    }
+
+    .item-pulse {
+      position: absolute;
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0.4);
+      animation: itemPulse 1.8s ease-out infinite;
+    }
+
+    .item-body {
+      position: absolute;
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      box-shadow: 0 0 20px rgba(255,255,255,0.4);
+      animation: itemFloat 2.5s ease-in-out infinite;
+    }
+
+    @keyframes itemPulse {
+      0%   { transform: translate(-50%,-50%) scale(0.4); opacity: 0.8; }
+      100% { transform: translate(-50%,-50%) scale(1.8); opacity: 0; }
+    }
+
+    @keyframes itemFloat {
+      0%,100% { transform: translate(-50%,-50%) translateY(0); }
+      50%      { transform: translate(-50%,-50%) translateY(-5px); }
+    }
+
+    /* ── COLLECT FLASH ───────────────────────────── */
+    #collectFlash {
+      position: fixed; inset: 0;
+      z-index: 8000;
+      pointer-events: none;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 80px;
+      animation: flashAnim 0.6s ease both;
+    }
+
+    @keyframes flashAnim {
+      0%   { opacity: 0; transform: scale(0.5); }
+      40%  { opacity: 1; transform: scale(1.3); }
+      100% { opacity: 0; transform: scale(1); }
+    }
+
+    /* ── LEAFLET OVERRIDES ───────────────────────── */
+    .leaflet-popup-content-wrapper {
+      background: var(--surface) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 14px !important;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important;
+      color: var(--text) !important;
+    }
+
+    .leaflet-popup-tip { background: var(--surface) !important; }
 
     .leaflet-popup-content {
+      font-family: 'Nunito', sans-serif !important;
+      font-size: 13px !important;
+      font-weight: 600 !important;
       text-align: center;
-      font-size: 14px;
+      line-height: 1.6 !important;
+      margin: 10px 14px !important;
     }
+
+    .leaflet-control-zoom a {
+      background: rgba(11,15,26,0.85) !important;
+      color: var(--text) !important;
+      border-color: var(--border) !important;
+      backdrop-filter: blur(8px);
+    }
+
+    .leaflet-control-zoom a:hover {
+      background: var(--surface2) !important;
+    }
+
+    .leaflet-control-attribution {
+      background: rgba(11,15,26,0.7) !important;
+      color: var(--muted) !important;
+      backdrop-filter: blur(6px);
+      font-size: 9px !important;
+    }
+
+    .leaflet-control-attribution a { color: var(--accent2) !important; }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
   </style>
 </head>
 <body>
 
-<div class="menu" id="menu">
-  <div class="card">
-    <h1>GeoGO</h1>
-    <p>Pokémon GO style multiplayer map</p>
+<!-- COLLECT FLASH -->
+<div id="collectFlash">🎁</div>
 
-    <input id="nickname" placeholder="Nickname" maxlength="20" />
-    <input id="room" placeholder="Room ID (optional)" />
+<!-- MAP -->
+<div id="map"></div>
 
-    <button id="createBtn">Create Room</button>
-    <button id="joinBtn">Join Room</button>
+<!-- MENU -->
+<div id="menu">
+  <div class="stars"></div>
+  <div class="menu-card">
+    <div class="logo">
+      <span class="logo-icon">🌍</span>
+      <h1>GeoGO</h1>
+      <p>Real-world multiplayer — catch together</p>
+    </div>
+    <div class="divider"></div>
 
-    <div class="room-box" id="roomBox">
-      No room created yet.
+    <div class="field">
+      <label>Your Nickname</label>
+      <input id="nickname" placeholder="Enter nickname…" maxlength="20" autocomplete="off"/>
+    </div>
+    <div class="field">
+      <label>Room ID <span style="font-weight:400;text-transform:none;font-size:10px;">(leave blank to create)</span></label>
+      <input id="roomInput" placeholder="e.g. ABC123" maxlength="10" autocomplete="off" style="text-transform:uppercase;letter-spacing:0.1em;font-family:'Space Mono',monospace;"/>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-create" id="createBtn">✦ Create</button>
+      <button class="btn btn-join" id="joinBtn">→ Join</button>
+    </div>
+
+    <div class="room-display" id="roomDisplay">
+      Enter a nickname and create or join a room.
     </div>
   </div>
 </div>
 
-<div class="status">
-  <div><b>Role:</b> <span id="roleText">-</span></div>
-  <div><b>Host:</b> <span id="hostText">-</span></div>
-  <div><b>Room:</b> <span id="roomText">-</span></div>
+<!-- HUD: INFO -->
+<div class="hud" id="hud-info" style="display:none;">
+  <div class="info-row" style="margin-bottom:2px;">
+    <span id="roleBadge" class="badge badge-host">HOST 👑</span>
+  </div>
+  <div class="info-row">
+    <span class="info-label">Room</span>
+    <span class="info-val" id="infoRoom" style="font-family:'Space Mono',monospace;color:var(--accent);letter-spacing:0.1em;">-</span>
+  </div>
+  <div class="info-row">
+    <span class="info-label">Players</span>
+    <span class="info-val" id="infoPlayers">1</span>
+  </div>
+  <div class="info-row">
+    <span class="info-label">Items</span>
+    <span class="info-val" id="infoItems">0</span>
+  </div>
 </div>
 
-<button class="exit-btn" id="exitBtn">
-  Exit
-</button>
+<!-- HUD: EXIT -->
+<div class="hud" id="hud-exit" style="display:none;">
+  <button id="exitBtn">✕ Exit</button>
+</div>
 
-<div id="map"></div>
+<!-- HUD: CHAT -->
+<div class="hud" id="hud-chat" style="display:none;">
+  <div class="chat-box">
+    <div class="chat-header">
+      <div class="chat-dot"></div>
+      Live Chat
+    </div>
+    <div id="chatMessages"></div>
+    <div class="chat-input-row">
+      <input id="chatInput" placeholder="Say something…" maxlength="120" autocomplete="off"/>
+      <button id="chatSend">Send</button>
+    </div>
+  </div>
+</div>
 
-<!-- Leaflet -->
+<!-- HUD: NOTIFICATIONS -->
+<div class="hud" id="hud-notify"></div>
+
+<!-- LEAFLET -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<!-- PeerJS -->
+<!-- PEERJS -->
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
 <script>
-  // =========================
-  // MAP
-  // =========================
+// ═══════════════════════════════════════════════
+//  GeoGO — Pure Frontend Multiplayer Map Game
+// ═══════════════════════════════════════════════
 
-  const map = L.map('map').setView([14.5995, 120.9842], 18);
+/* ── MAP SETUP ──────────────────────────────── */
+const map = L.map('map', { zoomControl: true }).setView([14.5995, 120.9842], 17);
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap'
-  }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  maxZoom: 20,
+}).addTo(map);
 
-  // =========================
-  // UI
-  // =========================
+/* ── DOM REFS ───────────────────────────────── */
+const $  = id => document.getElementById(id);
+const menu      = $('menu');
+const nicknameEl= $('nickname');
+const roomInputEl=$('roomInput');
+const createBtn = $('createBtn');
+const joinBtn   = $('joinBtn');
+const roomDisplay=$('roomDisplay');
+const hudInfo   = $('hud-info');
+const hudExit   = $('hud-exit');
+const hudChat   = $('hud-chat');
+const hudNotify = $('hud-notify');
+const exitBtn   = $('exitBtn');
+const roleBadge = $('roleBadge');
+const infoRoom  = $('infoRoom');
+const infoPlayers=$('infoPlayers');
+const infoItems = $('infoItems');
+const chatMessages=$('chatMessages');
+const chatInput = $('chatInput');
+const chatSend  = $('chatSend');
+const collectFlash=$('collectFlash');
 
-  const menu = document.getElementById('menu');
-  const nicknameInput = document.getElementById('nickname');
-  const roomInput = document.getElementById('room');
-  const createBtn = document.getElementById('createBtn');
-  const joinBtn = document.getElementById('joinBtn');
-  const roomBox = document.getElementById('roomBox');
-  const exitBtn = document.getElementById('exitBtn');
+/* ── STATE ──────────────────────────────────── */
+let nickname   = '';
+let myColor    = '';
+let roomId     = '';
+let isHost     = false;
+let peer       = null;
+let watchId    = null;
 
-  const roleText = document.getElementById('roleText');
-  const hostText = document.getElementById('hostText');
-  const roomText = document.getElementById('roomText');
+// Map of peerId → { conn, marker, data }
+const peers    = {};
 
-  // =========================
-  // PLAYER VARIABLES
-  // =========================
+// My own marker
+let myMarker   = null;
+let myLat      = null, myLng = null;
 
-  let nickname = "";
-  let myMarker = null;
-  let peer = null;
-  let roomId = null;
-  let watchId = null;
-  let isHost = false;
+// Items: { itemId → { marker, lat, lng, emoji, color } }
+const items    = {};
+let itemSpawnTimer = null;
 
-  const connections = [];
-  const players = {};
+// Connections (host stores all, client stores one)
+const connections = []; // array of Peer DataConnection
 
-  let myColor = randomColor();
+// Sequence counters to avoid loops
+const seenMsgIds = new Set();
 
-  // =========================
-  // CREATE ROOM
-  // =========================
+/* ── ITEM CONFIG ────────────────────────────── */
+const ITEM_EMOJIS  = ['🍎','⭐','💎','🔮','🎀','🍀','🏆','🎯','🌸','🎸','💫','🔑'];
+const ITEM_COLORS  = ['#f472b6','#fbbf24','#818cf8','#34d399','#fb923c','#60a5fa'];
+const COLLECT_RADIUS_M = 40; // metres
+const ITEM_SPAWN_INTERVAL = 12000; // ms
+const ITEM_MAX  = 8;
 
-  createBtn.onclick = () => {
-    nickname = nicknameInput.value.trim();
+/* ── PLAYER COLORS ──────────────────────────── */
+const PLAYER_COLORS = ['#4ade80','#60a5fa','#f472b6','#fb923c','#a78bfa','#34d399','#facc15','#f87171'];
+function pickColor() {
+  return PLAYER_COLORS[Math.floor(Math.random() * PLAYER_COLORS.length)];
+}
 
-    if (!nickname) {
-      alert("Please enter a nickname");
-      return;
-    }
+/* ── UTILS ──────────────────────────────────── */
+function uid() { return Math.random().toString(36).substring(2,10); }
+function genRoomId() { return Math.random().toString(36).substring(2,8).toUpperCase(); }
+function haversine(lat1,lng1,lat2,lng2){
+  const R=6371000, dLat=(lat2-lat1)*Math.PI/180, dLng=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function randomNearby(lat,lng,minM=20,maxM=150){
+  const angle=Math.random()*2*Math.PI;
+  const dist =minM+Math.random()*(maxM-minM);
+  const dLat =dist*Math.cos(angle)/111320;
+  const dLng =dist*Math.sin(angle)/(111320*Math.cos(lat*Math.PI/180));
+  return [lat+dLat, lng+dLng];
+}
 
-    roomId = generateRoomId();
-    isHost = true;
+/* ── PLAYER ICON ────────────────────────────── */
+function makePlayerIcon(color, isHostPlayer) {
+  return L.divIcon({
+    className: '',
+    html: `
+      <div class="player-icon-wrapper">
+        ${isHostPlayer ? '<div class="player-crown">👑</div>' : ''}
+        <div class="player-pulse" style="background:${color}"></div>
+        <div class="player-dot"  style="background:${color}"></div>
+      </div>
+    `,
+    iconSize: [24,24],
+    iconAnchor: [12,12],
+    popupAnchor: [0,-24],
+  });
+}
 
-    roomBox.innerHTML = `
-      <b>Room Created</b><br><br>
-      Share this Room ID:<br><br>
-      <b>${roomId}</b>
-    `;
+/* ── ITEM ICON ──────────────────────────────── */
+function makeItemIcon(emoji, color) {
+  return L.divIcon({
+    className: '',
+    html: `
+      <div class="item-icon-wrapper">
+        <div class="item-pulse" style="background:${color}"></div>
+        <div class="item-body" style="background:${color}30;border:2px solid ${color}">${emoji}</div>
+      </div>
+    `,
+    iconSize: [32,32],
+    iconAnchor: [16,16],
+    popupAnchor: [0,-20],
+  });
+}
 
-    startHost();
-  };
+/* ── NOTIFICATIONS ──────────────────────────── */
+function notify(msg) {
+  const el = document.createElement('div');
+  el.className = 'notify';
+  el.innerHTML = msg;
+  hudNotify.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
 
-  // =========================
-  // JOIN ROOM
-  // =========================
-
-  joinBtn.onclick = () => {
-    nickname = nicknameInput.value.trim();
-    roomId = roomInput.value.trim();
-
-    if (!nickname || !roomId) {
-      alert("Enter nickname and room ID");
-      return;
-    }
-
-    startClient();
-  };
-
-  // =========================
-  // EXIT BUTTON
-  // =========================
-
-  exitBtn.onclick = () => {
-    location.reload();
-  };
-
-  // =========================
-  // HOST
-  // =========================
-
-  function startHost() {
-    peer = new Peer(roomId);
-
-    peer.on('open', () => {
-      menu.style.display = 'none';
-      exitBtn.style.display = 'block';
-
-      roleText.innerText = "HOST 👑";
-      hostText.innerText = nickname;
-      roomText.innerText = roomId;
-
-      startGPS();
-    });
-
-    peer.on('connection', (conn) => {
-      setupConnection(conn);
-    });
+/* ── CHAT ───────────────────────────────────── */
+function addChatMsg(name, text, isSystem=false) {
+  const div = document.createElement('div');
+  div.className = isSystem ? 'chat-msg system' : 'chat-msg';
+  if (isSystem) {
+    div.textContent = text;
+  } else {
+    div.innerHTML = `<span class="msg-name" style="color:${getPeerColor(name)}">${escHtml(name)}:</span> ${escHtml(text)}`;
   }
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
 
-  // =========================
-  // CLIENT
-  // =========================
-
-  function startClient() {
-    peer = new Peer();
-
-    peer.on('open', () => {
-      const conn = peer.connect(roomId);
-
-      conn.on('open', () => {
-        setupConnection(conn);
-
-        menu.style.display = 'none';
-        exitBtn.style.display = 'block';
-
-        roleText.innerText = "PLAYER 👤";
-        roomText.innerText = roomId;
-
-        startGPS();
-      });
-    });
+function getPeerColor(name) {
+  // Find peer with matching nickname
+  for (const p of Object.values(peers)) {
+    if (p.data && p.data.nickname === name) return p.data.color;
   }
+  if (name === nickname) return myColor;
+  return 'var(--muted)';
+}
 
-  // =========================
-  // CONNECTION
-  // =========================
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 
-  function setupConnection(conn) {
-    connections.push(conn);
+function sendChat(text) {
+  if (!text.trim()) return;
+  const msg = { type:'chat', msgId: uid(), nickname, text: text.trim() };
+  addChatMsg(nickname, text.trim());
+  broadcast(msg);
+}
 
-    conn.on('data', (data) => {
+chatSend.onclick = () => { sendChat(chatInput.value); chatInput.value=''; };
+chatInput.addEventListener('keydown', e => {
+  if (e.key==='Enter') { sendChat(chatInput.value); chatInput.value=''; }
+});
 
-      // Show host name to joined users
-      if (data.host) {
-        hostText.innerText = data.nickname;
-      }
+/* ── UPDATE PLAYER COUNT ────────────────────── */
+function updatePlayerCount() {
+  infoPlayers.textContent = 1 + Object.keys(peers).length;
+}
 
-      updatePlayer(data);
+function updateItemCount() {
+  infoItems.textContent = Object.keys(items).length;
+}
 
-      // Host rebroadcasts to everyone
-      if (isHost) {
-        broadcast(data);
-      }
-    });
+/* ── SHOW HUD ───────────────────────────────── */
+function showHUD() {
+  menu.style.display = 'none';
+  hudInfo.style.display = 'block';
+  hudExit.style.display = 'block';
+  hudChat.style.display = 'block';
+}
 
-    conn.on('close', () => {
-      console.log('Disconnected');
-    });
-  }
-
-  // =========================
-  // GPS
-  // =========================
-
-  function startGPS() {
-
-    if (!navigator.geolocation) {
-      alert("Geolocation unsupported");
-      return;
-    }
-
-    watchId = navigator.geolocation.watchPosition(
-
-      (position) => {
-
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-
-        updateMe(lat, lng);
-
-        const payload = {
-          id: peer.id,
-          nickname,
-          lat,
-          lng,
-          color: myColor,
-          host: isHost
-        };
-
-        broadcast(payload);
-      },
-
-      (err) => {
-        console.error(err);
-        alert("Location permission denied");
-      },
-
-      {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 5000
-      }
-
-    );
-  }
-
-  // =========================
-  // PLAYER ICON
-  // =========================
-
-  function createPlayerIcon(color) {
-
-    return L.divIcon({
-      className: '',
-      html: `
-        <div class="player-wrapper">
-          <div class="pulse" style="background:${color}"></div>
-          <div class="dot" style="background:${color}"></div>
-        </div>
-      `,
-      iconSize: [24, 24],
-      iconAnchor: [12, 12]
-    });
-
-  }
-
-  // =========================
-  // UPDATE ME
-  // =========================
-
-  function updateMe(lat, lng) {
-
-    map.setView([lat, lng]);
-
-    const icon = createPlayerIcon(myColor);
-
-    if (!myMarker) {
-
-      myMarker = L.marker([lat, lng], { icon })
-        .addTo(map)
-        .bindPopup(`
-          🟢 You<br>
-          ${nickname}<br>
-          ${isHost ? '👑 Host' : '👤 Player'}
-        `);
-
-    } else {
-
-      myMarker.setLatLng([lat, lng]);
-
-    }
-  }
-
-  // =========================
-  // UPDATE OTHER PLAYERS
-  // =========================
-
-  function updatePlayer(data) {
-
-    if (data.id === peer.id) return;
-
-    const icon = createPlayerIcon(data.color);
-
-    if (!players[data.id]) {
-
-      players[data.id] = L.marker(
-        [data.lat, data.lng],
-        { icon }
-      )
+/* ── PLAYER MARKER UPDATE ───────────────────── */
+function upsertMyMarker(lat, lng) {
+  map.setView([lat, lng], map.getZoom());
+  const icon = makePlayerIcon(myColor, isHost);
+  if (!myMarker) {
+    myMarker = L.marker([lat,lng], { icon, zIndexOffset: 1000 })
       .addTo(map)
-      .bindPopup(`
-        ${data.host ? '👑 HOST' : '👤 PLAYER'}<br>
-        ${data.nickname}
-      `);
+      .bindPopup(`<b style="color:${myColor}">${escHtml(nickname)}</b><br>${isHost?'👑 Host':'👤 Player'}<br><i>You</i>`);
+  } else {
+    myMarker.setLatLng([lat,lng]);
+    myMarker.setIcon(icon);
+  }
+}
 
+function upsertPeerMarker(peerId, data) {
+  const icon = makePlayerIcon(data.color, data.isHost);
+  if (!peers[peerId]) {
+    peers[peerId] = {
+      conn: peers[peerId]?.conn || null,
+      marker: L.marker([data.lat,data.lng], { icon })
+        .addTo(map)
+        .bindPopup(`<b style="color:${data.color}">${escHtml(data.nickname)}</b><br>${data.isHost?'👑 Host':'👤 Player'}`),
+      data,
+    };
+  } else {
+    if (!peers[peerId].marker) {
+      peers[peerId].marker = L.marker([data.lat,data.lng], { icon })
+        .addTo(map)
+        .bindPopup(`<b style="color:${data.color}">${escHtml(data.nickname)}</b><br>${data.isHost?'👑 Host':'👤 Player'}`);
     } else {
-
-      players[data.id].setLatLng([data.lat, data.lng]);
-
+      peers[peerId].marker.setLatLng([data.lat,data.lng]);
+      peers[peerId].marker.setIcon(icon);
+      peers[peerId].marker.getPopup()?.setContent(`<b style="color:${data.color}">${escHtml(data.nickname)}</b><br>${data.isHost?'👑 Host':'👤 Player'}`);
     }
+    peers[peerId].data = data;
   }
+}
 
-  // =========================
-  // BROADCAST
-  // =========================
+function removePeer(peerId) {
+  if (peers[peerId]) {
+    if (peers[peerId].marker) map.removeLayer(peers[peerId].marker);
+    const name = peers[peerId].data?.nickname || peerId;
+    delete peers[peerId];
+    addChatMsg('', `${name} left ❌`, true);
+    notify(`${name} left ❌`);
+    updatePlayerCount();
+  }
+}
 
-  function broadcast(data) {
+/* ── ITEM MANAGEMENT ────────────────────────── */
+function spawnItem(itemId, lat, lng, emoji, color) {
+  if (items[itemId]) return; // already exists
+  const icon = makeItemIcon(emoji, color);
+  const marker = L.marker([lat,lng], { icon })
+    .addTo(map)
+    .bindPopup(`<b>${emoji} Item</b><br><small>Get close to collect!</small>`);
+  items[itemId] = { marker, lat, lng, emoji, color };
+  updateItemCount();
+}
 
-    connections.forEach(conn => {
+function removeItem(itemId) {
+  if (!items[itemId]) return;
+  map.removeLayer(items[itemId].marker);
+  delete items[itemId];
+  updateItemCount();
+}
 
-      if (conn.open) {
-        conn.send(data);
+function hostSpawnItem() {
+  if (!isHost) return;
+  if (Object.keys(items).length >= ITEM_MAX) return;
+  if (myLat === null) return;
+
+  const itemId = uid();
+  const [lat, lng] = randomNearby(myLat, myLng);
+  const emoji = ITEM_EMOJIS[Math.floor(Math.random()*ITEM_EMOJIS.length)];
+  const color = ITEM_COLORS[Math.floor(Math.random()*ITEM_COLORS.length)];
+
+  spawnItem(itemId, lat, lng, emoji, color);
+
+  const msg = { type:'item_spawn', itemId, lat, lng, emoji, color };
+  broadcast(msg);
+}
+
+function checkCollect() {
+  if (myLat === null) return;
+  for (const [itemId, item] of Object.entries(items)) {
+    const dist = haversine(myLat, myLng, item.lat, item.lng);
+    if (dist <= COLLECT_RADIUS_M) {
+      // Collect!
+      removeItem(itemId);
+      const msg = { type:'item_collect', itemId, collector: nickname };
+      broadcast(msg);
+
+      // Flash animation
+      collectFlash.style.textContent = item.emoji;
+      collectFlash.querySelector ? null : null;
+      collectFlash.textContent = item.emoji;
+      collectFlash.style.display = 'flex';
+      setTimeout(() => { collectFlash.style.display = 'none'; }, 700);
+
+      notify(`You collected ${item.emoji}!`);
+      addChatMsg('', `${nickname} collected ${item.emoji}!`, true);
+
+      // Tell everyone
+      if (isHost) {
+        broadcast({ type:'item_collect', itemId, collector: nickname });
       }
-
-    });
-
+    }
   }
+}
 
-  // =========================
-  // RANDOM ROOM
-  // =========================
-
-  function generateRoomId() {
-
-    return Math.random()
-      .toString(36)
-      .substring(2, 8)
-      .toUpperCase();
-
+/* ── BROADCAST ──────────────────────────────── */
+function broadcast(data) {
+  for (const p of Object.values(peers)) {
+    if (p.conn && p.conn.open) {
+      try { p.conn.send(data); } catch(e) {}
+    }
   }
-
-  // =========================
-  // RANDOM PLAYER COLOR
-  // =========================
-
-  function randomColor() {
-
-    const colors = [
-      '#3B82F6',
-      '#EF4444',
-      '#10B981',
-      '#F59E0B',
-      '#8B5CF6',
-      '#EC4899',
-      '#06B6D4'
-    ];
-
-    return colors[
-      Math.floor(Math.random() * colors.length)
-    ];
-
+  // Also send to connections array (host uses both)
+  for (const conn of connections) {
+    if (conn.open) {
+      const alreadySent = Object.values(peers).some(p=>p.conn===conn);
+      if (!alreadySent) {
+        try { conn.send(data); } catch(e) {}
+      }
+    }
   }
+}
 
-  // =========================
-  // CLEANUP
-  // =========================
+/* ── HANDLE INCOMING MESSAGE ────────────────── */
+function handleMessage(data, fromConn) {
+  if (!data || !data.type) return;
 
-  window.addEventListener('beforeunload', () => {
+  switch(data.type) {
 
-    if (watchId) {
-      navigator.geolocation.clearWatch(watchId);
+    case 'position': {
+      // Dedupe: don't re-broadcast own position
+      if (data.peerId === peer?.id) return;
+      upsertPeerMarker(data.peerId, data);
+      updatePlayerCount();
+
+      // Host relays to everyone
+      if (isHost) {
+        for (const p of Object.values(peers)) {
+          if (p.conn && p.conn !== fromConn && p.conn.open) {
+            try { p.conn.send(data); } catch(e){}
+          }
+        }
+      }
+      break;
     }
 
-    if (peer) {
-      peer.destroy();
+    case 'chat': {
+      if (seenMsgIds.has(data.msgId)) return;
+      seenMsgIds.add(data.msgId);
+      if (data.nickname !== nickname) {
+        addChatMsg(data.nickname, data.text);
+      }
+      // Relay
+      if (isHost) {
+        for (const p of Object.values(peers)) {
+          if (p.conn && p.conn !== fromConn && p.conn.open) {
+            try { p.conn.send(data); } catch(e){}
+          }
+        }
+      }
+      break;
     }
 
+    case 'item_spawn': {
+      if (!items[data.itemId]) {
+        spawnItem(data.itemId, data.lat, data.lng, data.emoji, data.color);
+      }
+      break;
+    }
+
+    case 'item_collect': {
+      if (items[data.itemId]) {
+        removeItem(data.itemId);
+        if (data.collector !== nickname) {
+          notify(`${data.collector} collected ${data.emoji || '🎁'}!`);
+          addChatMsg('', `${data.collector} collected something!`, true);
+        }
+      }
+      // Host relays
+      if (isHost) {
+        for (const p of Object.values(peers)) {
+          if (p.conn && p.conn !== fromConn && p.conn.open) {
+            try { p.conn.send(data); } catch(e){}
+          }
+        }
+      }
+      break;
+    }
+
+    case 'full_state': {
+      // Client receives initial state from host
+      if (data.items) {
+        for (const [id, item] of Object.entries(data.items)) {
+          spawnItem(id, item.lat, item.lng, item.emoji, item.color);
+        }
+      }
+      if (data.players) {
+        for (const [pid, pdata] of Object.entries(data.players)) {
+          if (pid !== peer?.id) {
+            upsertPeerMarker(pid, pdata);
+          }
+        }
+        updatePlayerCount();
+      }
+      break;
+    }
+
+    case 'join_notify': {
+      if (seenMsgIds.has(data.msgId)) return;
+      seenMsgIds.add(data.msgId);
+      if (data.nickname !== nickname) {
+        addChatMsg('', `${data.nickname} joined 🎮`, true);
+        notify(`${data.nickname} joined 🎮`);
+      }
+      if (isHost) {
+        for (const p of Object.values(peers)) {
+          if (p.conn && p.conn !== fromConn && p.conn.open) {
+            try { p.conn.send(data); } catch(e){}
+          }
+        }
+      }
+      break;
+    }
+  }
+}
+
+/* ── SETUP A CONNECTION ─────────────────────── */
+function setupConn(conn) {
+  const peerId = conn.peer;
+
+  // Store connection ref (might not have peer data yet)
+  if (!peers[peerId]) peers[peerId] = { conn, marker: null, data: null };
+  else peers[peerId].conn = conn;
+
+  conn.on('data', data => {
+    // If peer data arrives, sync
+    if (data.type === 'position' && !peers[peerId]?.data) {
+      peers[peerId].data = data;
+    }
+    handleMessage(data, conn);
   });
 
-</script>
+  conn.on('close', () => removePeer(peerId));
+  conn.on('error', () => removePeer(peerId));
 
+  // Host: send full state to new joiner
+  if (isHost) {
+    const playerSnapshot = {};
+    for (const [pid, p] of Object.entries(peers)) {
+      if (p.data && pid !== peerId) playerSnapshot[pid] = p.data;
+    }
+    // Include self
+    if (myLat !== null) {
+      playerSnapshot[peer.id] = {
+        type: 'position', peerId: peer.id, nickname, color: myColor,
+        lat: myLat, lng: myLng, isHost: true
+      };
+    }
+    setTimeout(() => {
+      if (conn.open) {
+        conn.send({
+          type: 'full_state',
+          items: Object.fromEntries(
+            Object.entries(items).map(([id,i])=>[id,{lat:i.lat,lng:i.lng,emoji:i.emoji,color:i.color}])
+          ),
+          players: playerSnapshot,
+        });
+      }
+    }, 800);
+  }
+}
+
+/* ── GPS ────────────────────────────────────── */
+function startGPS() {
+  if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
+
+  watchId = navigator.geolocation.watchPosition(pos => {
+    myLat = pos.coords.latitude;
+    myLng = pos.coords.longitude;
+
+    upsertMyMarker(myLat, myLng);
+    checkCollect();
+
+    const posMsg = {
+      type: 'position',
+      peerId: peer.id,
+      nickname,
+      color: myColor,
+      lat: myLat,
+      lng: myLng,
+      isHost,
+    };
+    broadcast(posMsg);
+
+  }, err => {
+    console.warn('GPS error', err);
+    // Try to proceed anyway with default location
+    if (myLat === null) {
+      myLat = 14.5995; myLng = 120.9842;
+      upsertMyMarker(myLat, myLng);
+      notify('📍 GPS unavailable — using default location');
+    }
+  }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 });
+}
+
+/* ── HOST SETUP ─────────────────────────────── */
+function startHost() {
+  peer = new Peer(roomId, { debug: 0 });
+
+  peer.on('open', () => {
+    isHost = true;
+    roleBadge.textContent = 'HOST 👑';
+    roleBadge.className = 'badge badge-host';
+    infoRoom.textContent = roomId;
+    showHUD();
+    startGPS();
+
+    // Start spawning items
+    itemSpawnTimer = setInterval(hostSpawnItem, ITEM_SPAWN_INTERVAL);
+    setTimeout(hostSpawnItem, 3000); // First spawn sooner
+  });
+
+  peer.on('connection', conn => {
+    connections.push(conn);
+    setupConn(conn);
+
+    // Notify others of join
+    conn.on('open', () => {
+      setTimeout(() => {
+        if (conn.open && peers[conn.peer]?.data) {
+          const name = peers[conn.peer].data.nickname;
+          const jmsg = { type:'join_notify', msgId: uid(), nickname: name };
+          handleMessage(jmsg, conn); // Process locally
+          broadcast(jmsg);
+        }
+      }, 1200);
+    });
+  });
+
+  peer.on('error', e => {
+    if (e.type === 'unavailable-id') {
+      roomId = genRoomId();
+      roomDisplay.innerHTML = `Room ID taken, generated new:<br><span class="room-id">${roomId}</span>`;
+      startHost();
+    } else {
+      console.error(e);
+    }
+  });
+}
+
+/* ── CLIENT SETUP ───────────────────────────── */
+function startClient() {
+  peer = new Peer(undefined, { debug: 0 });
+
+  peer.on('open', () => {
+    const conn = peer.connect(roomId, { reliable: true });
+    connections.push(conn);
+
+    conn.on('open', () => {
+      if (!peers[roomId]) peers[roomId] = { conn, marker: null, data: null };
+      else peers[roomId].conn = conn;
+
+      // Register in peers by actual host peer id
+      // We'll update once we get position data
+      setupConn(conn);
+
+      roleBadge.textContent = 'PLAYER 👤';
+      roleBadge.className = 'badge badge-player';
+      infoRoom.textContent = roomId;
+      showHUD();
+      startGPS();
+
+      // Announce join
+      broadcast({ type:'join_notify', msgId: uid(), nickname });
+    });
+
+    conn.on('error', e => {
+      alert('Could not connect to room. Check the Room ID and try again.');
+      location.reload();
+    });
+  });
+
+  peer.on('error', e => {
+    alert('Connection error: ' + e.type);
+    console.error(e);
+  });
+}
+
+/* ── MENU ACTIONS ───────────────────────────── */
+createBtn.onclick = () => {
+  nickname = nicknameInput.value.trim();
+  if (!nickname) { nicknameInput.focus(); return; }
+  myColor = pickColor();
+  roomId  = genRoomId();
+
+  roomDisplay.innerHTML = `Room created! Share this ID:<br><span class="room-id">${roomId}</span>`;
+  createBtn.disabled = true;
+  joinBtn.disabled   = true;
+
+  startHost();
+};
+
+joinBtn.onclick = () => {
+  nickname = nicknameInput.value.trim();
+  roomId   = roomInputEl.value.trim().toUpperCase();
+  if (!nickname) { nicknameInput.focus(); return; }
+  if (!roomId)   { roomInputEl.focus(); return; }
+  myColor  = pickColor();
+
+  roomDisplay.innerHTML = `Connecting to <span class="room-id">${roomId}</span>…`;
+  createBtn.disabled = true;
+  joinBtn.disabled   = true;
+
+  startClient();
+};
+
+nicknameEl.addEventListener('keydown', e => { if(e.key==='Enter') roomInputEl.focus(); });
+roomInputEl.addEventListener('keydown', e => { if(e.key==='Enter') joinBtn.click(); });
+roomInputEl.addEventListener('input', () => {
+  roomInputEl.value = roomInputEl.value.toUpperCase().replace(/[^A-Z0-9]/g,'');
+});
+
+/* ── EXIT ───────────────────────────────────── */
+exitBtn.onclick = () => {
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  if (itemSpawnTimer) clearInterval(itemSpawnTimer);
+  if (peer) peer.destroy();
+  location.reload();
+};
+
+/* ── CLEANUP ────────────────────────────────── */
+window.addEventListener('beforeunload', () => {
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  if (itemSpawnTimer) clearInterval(itemSpawnTimer);
+  if (peer) peer.destroy();
+});
+</script>
 </body>
 </html>
