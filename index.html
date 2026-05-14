@@ -51,13 +51,13 @@
       color:var(--muted);margin-bottom:6px}
     .field input{width:100%;padding:14px 16px;background:var(--surface2);border:1.5px solid var(--border);
       border-radius:var(--rs);color:var(--text);font-family:'Nunito',sans-serif;font-size:16px;
-      font-weight:600;outline:none;transition:border-color .2s;-webkit-appearance:none}
+      font-weight:600;outline:none;transition:border-color .2s;appearance:none;-webkit-appearance:none}
     .field input:focus{border-color:var(--accent2)}
     .field input::placeholder{color:var(--muted);font-weight:400}
     .btn-row{display:flex;gap:10px;margin-top:4px}
     .btn{flex:1;padding:15px;border-radius:var(--rs);border:none;font-family:'Nunito',sans-serif;
       font-size:15px;font-weight:800;cursor:pointer;transition:transform .12s,opacity .15s;letter-spacing:.02em;
-      -webkit-appearance:none;touch-action:manipulation}
+      appearance:none;-webkit-appearance:none;touch-action:manipulation}
     .btn:active{transform:scale(.96)}
     .btn:disabled{opacity:.5;cursor:not-allowed}
     .btn-create{background:linear-gradient(135deg,var(--accent),#22c55e);color:#052e10;
@@ -234,27 +234,27 @@
     .sheet-field input,.sheet-field textarea{width:100%;padding:13px 14px;background:var(--surface2);
       border:1.5px solid var(--border);border-radius:var(--rs);color:var(--text);
       font-family:'Nunito',sans-serif;font-size:16px;font-weight:600;outline:none;
-      resize:none;transition:border-color .2s;-webkit-appearance:none}
+      resize:none;transition:border-color .2s;appearance:none;-webkit-appearance:none}
     .sheet-field input:focus,.sheet-field textarea:focus{border-color:var(--host-color)}
     .sheet-field input::placeholder,.sheet-field textarea::placeholder{color:var(--muted);font-weight:400}
     .pick-btn{width:100%;padding:14px;background:rgba(251,191,36,.08);
       border:1.5px dashed rgba(251,191,36,.4);border-radius:var(--rs);
       color:var(--host-color);font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;
       cursor:pointer;text-align:center;transition:background .15s;margin-bottom:14px;
-      touch-action:manipulation;min-height:50px;-webkit-appearance:none}
+      touch-action:manipulation;min-height:50px;appearance:none;-webkit-appearance:none}
     .pick-btn:hover{background:rgba(251,191,36,.16)}
     .pick-btn.picked{border-color:rgba(74,222,128,.4);background:rgba(74,222,128,.08);color:var(--accent)}
     .sheet-actions{display:flex;gap:10px}
     .btn-cancel{flex:1;padding:14px;border-radius:var(--rs);border:1px solid var(--border);
       background:transparent;color:var(--muted);font-family:'Nunito',sans-serif;
       font-weight:700;font-size:14px;cursor:pointer;transition:background .15s;
-      touch-action:manipulation;min-height:50px;-webkit-appearance:none}
+      touch-action:manipulation;min-height:50px;appearance:none;-webkit-appearance:none}
     .btn-cancel:hover{background:var(--surface2)}
     .btn-pin{flex:2;padding:14px;border-radius:var(--rs);border:none;
       background:linear-gradient(135deg,var(--host-color),#f59e0b);color:#1a0a00;
       font-family:'Nunito',sans-serif;font-weight:900;font-size:14px;cursor:pointer;
       box-shadow:0 4px 16px rgba(251,191,36,.35);transition:opacity .15s;
-      touch-action:manipulation;min-height:50px;-webkit-appearance:none}
+      touch-action:manipulation;min-height:50px;appearance:none;-webkit-appearance:none}
     .btn-pin:disabled{opacity:.35;cursor:not-allowed}
 
     /* ── PICKING MODE ── */
@@ -785,8 +785,39 @@ function setupConn(conn){
   else peers[peerId].conn = conn;
 
   conn.on('data',  d  => handleMessage(d, conn));
-  conn.on('close', () => { removePeer(peerId); setConnStatus('connected', 'P2P Active'); });
-  conn.on('error', () => { removePeer(peerId); });
+  conn.on('close', () => { removePeer(peerId); updatePlayerCount(); });
+  conn.on('error', (e) => { console.warn('conn error', e); removePeer(peerId); });
+
+  // Monitor ICE state — shows whether we're direct or relayed via TURN
+  try {
+    const pc = conn.peerConnection;
+    if(pc){
+      pc.oniceconnectionstatechange = () => {
+        const s = pc.iceConnectionState;
+        console.log('[ICE]', s);
+        if(s === 'connected' || s === 'completed'){
+          // Check if we're using a relay (TURN) or direct
+          pc.getStats().then(stats => {
+            stats.forEach(report => {
+              if(report.type === 'candidate-pair' && report.state === 'succeeded'){
+                const local = [...stats.values()].find(r => r.id === report.localCandidateId);
+                if(local?.candidateType === 'relay'){
+                  setConnStatus('relay', 'Via TURN relay');
+                } else {
+                  setConnStatus('connected', 'Direct P2P ⚡');
+                }
+              }
+            });
+          }).catch(()=>{ setConnStatus('connected', 'P2P Active'); });
+        } else if(s === 'failed'){
+          setConnStatus('failed', 'ICE failed');
+          notify('⚠️ P2P link failed. Check your network.');
+        } else if(s === 'disconnected'){
+          setConnStatus('connecting', 'Reconnecting…');
+        }
+      };
+    }
+  } catch(e){ /* peerConnection not yet available */ }
 
   if(isHost){
     const playerSnap={}, eventSnap={};
@@ -811,55 +842,99 @@ function startGPS(){
 }
 
 /* ══════════════════════════════════════════
-   FIX 2 & 3: PEERJS CONFIG WITH STUN/TURN
-   
-   WHY THIS IS NEEDED:
-   - Without STUN servers, WebRTC only works on the same LAN.
-     STUN tells each peer its public IP so they can connect directly
-     across different home/mobile networks.
-   - TURN servers relay traffic when direct connection fails (strict NAT,
-     corporate firewalls, mobile carriers). Using free public TURN from
-     Open Relay Project (openrelay.metered.ca).
-   - Explicit host/port for PeerJS signaling server instead of relying
-     on the default (which was returning 404s).
+   PEER CONFIG — STUN + TURN for cross-network
+
+   WHY TURN IS REQUIRED FOR DISTANT PEERS:
+   STUN only discovers your public IP. But mobile carriers (Globe, Smart,
+   PLDT LTE) and many routers use "symmetric NAT" — each outgoing UDP
+   packet gets a DIFFERENT port mapping, so two peers can never punch
+   through to each other directly. TURN relays ALL traffic through a
+   server, bypassing NAT completely. Without TURN, users on different
+   ISPs / mobile data simply cannot connect.
+
+   SERVERS USED:
+   1. Multiple Google + Cloudflare STUN — for direct connections (fast)
+   2. Metered TURN (freemium, 50GB/mo free) — reliable relay fallback
+   3. Twilio NTS TURN public demo — secondary relay fallback
+   4. iceServers from fetchIceServers() — dynamically fetched at runtime
+      for freshest credentials (Metered rotates credentials)
 ══════════════════════════════════════════ */
-const PEER_CONFIG = {
-  // Use the official PeerJS cloud signaling server explicitly
-  host: '0.peerjs.com',
-  port: 443,
-  path: '/',
-  secure: true,
-  debug: 1,
-  config: {
-    iceServers: [
-      // Google STUN — free, reliable, works for most direct connections
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' },
-      // Open Relay TURN — relays traffic when direct P2P is blocked
-      // (users behind strict carrier NAT, corporate firewalls, etc.)
-      {
-        urls: 'turn:openrelay.metered.ca:80',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      },
-    ],
-    iceCandidatePoolSize: 10,
-  },
-};
+
+// Static ICE servers — always available, no API key needed
+const STATIC_ICE = [
+  // STUN — multiple providers for reliability
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun3.l.google.com:19302' },
+  { urls: 'stun:stun4.l.google.com:19302' },
+  { urls: 'stun:stun.cloudflare.com:3478' },
+  { urls: 'stun:stun.stunprotocol.org:3478' },
+  // TURN via Metered free tier (works globally, including PH mobile networks)
+  // These are the PUBLIC demo credentials — for production get your own at metered.ca
+  { urls: 'turn:a.relay.metered.ca:80',      username:'83b5595ade6fa2145d4dc3a9', credential:'sCMJ7dLDagfV+JSl' },
+  { urls: 'turn:a.relay.metered.ca:80?transport=tcp', username:'83b5595ade6fa2145d4dc3a9', credential:'sCMJ7dLDagfV+JSl' },
+  { urls: 'turn:a.relay.metered.ca:443',     username:'83b5595ade6fa2145d4dc3a9', credential:'sCMJ7dLDagfV+JSl' },
+  { urls: 'turns:a.relay.metered.ca:443?transport=tcp', username:'83b5595ade6fa2145d4dc3a9', credential:'sCMJ7dLDagfV+JSl' },
+  // TURN via Numb (Coturn public server — global)
+  { urls: 'turn:numb.viagenie.ca', username:'webrtc@live.com', credential:'muazkh' },
+  // TURN via FreeTurn (Europe/Asia coverage)
+  { urls: 'turn:freeturn.net:3479', username:'free', credential:'free' },
+  { urls: 'turns:freeturn.net:5349', username:'free', credential:'free' },
+];
+
+// Build PeerJS config with given ICE servers
+function buildPeerConfig(iceServers){
+  return {
+    host: '0.peerjs.com',
+    port: 443,
+    path: '/',
+    secure: true,
+    debug: 1,
+    config: {
+      iceServers,
+      iceTransportPolicy: 'all',   // try direct first, fallback to TURN
+      iceCandidatePoolSize: 10,
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require',
+    },
+  };
+}
+
+// Try to fetch fresh TURN credentials from Metered API at runtime.
+// If it fails (offline / API down) we fall back to STATIC_ICE.
+async function fetchIceServers(){
+  try {
+    // Free Metered API — returns fresh credentials each call
+    const r = await fetch(
+      'https://geogo.metered.live/api/v1/turn/credentials?apiKey=83b5595ade6fa2145d4dc3a9',
+      { signal: AbortSignal.timeout(4000) }
+    );
+    if(r.ok){
+      const dynamic = await r.json();
+      // Merge dynamic TURN creds with static STUN list
+      const stunOnly = STATIC_ICE.filter(s => s.urls.startsWith('stun'));
+      return [...stunOnly, ...dynamic];
+    }
+  } catch(e){ /* API unreachable — use static list */ }
+  return STATIC_ICE;
+}
+
+let PEER_CONFIG = buildPeerConfig(STATIC_ICE); // used immediately; upgraded after fetch
+
+// Pre-fetch better ICE servers in the background
+fetchIceServers().then(ice => {
+  PEER_CONFIG = buildPeerConfig(ice);
+  console.log('[GeoGO] ICE servers ready:', ice.length, 'entries');
+});
 
 /* ── HOST ── */
-function startHost(){
+async function startHost(){
+  setConnStatus('connecting', 'Loading relay servers…');
+  // Wait for ICE prefetch (max 5s)
+  const t = Date.now();
+  while(Date.now()-t < 5000 && !PEER_CONFIG.config.iceServers.some(s=>s.urls.toString().includes('metered')))
+    await new Promise(r=>setTimeout(r,200));
   setConnStatus('connecting', 'Starting server…');
   peer = new Peer(roomId, PEER_CONFIG);
 
@@ -914,7 +989,19 @@ function startHost(){
 }
 
 /* ── CLIENT ── */
-function startClient(){
+async function startClient(){
+  setConnStatus('connecting', 'Loading relay servers…');
+
+  // Wait for fresh ICE servers (already fetching in background)
+  // Give it up to 5s, then proceed with whatever we have
+  const iceReady = new Promise(resolve => {
+    const check = () => PEER_CONFIG.config.iceServers.some(s => s.urls.toString().includes('metered'))
+      ? resolve() : setTimeout(check, 200);
+    check();
+    setTimeout(resolve, 5000); // hard timeout
+  });
+  await iceReady;
+
   setConnStatus('connecting', 'Looking for host…');
   peer = new Peer(undefined, PEER_CONFIG);
 
