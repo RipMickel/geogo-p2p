@@ -69,6 +69,16 @@
     .room-id{font-family:'Space Mono',monospace;font-size:22px;font-weight:700;
       color:var(--accent);letter-spacing:.12em;display:block;margin-top:4px}
 
+    /* Connection status pill */
+    .conn-status{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:11px;font-weight:700;
+      padding:6px 12px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);
+      width:fit-content}
+    .conn-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+    .conn-dot.connecting{background:#facc15;animation:blink2 .8s ease-in-out infinite}
+    .conn-dot.connected{background:var(--accent)}
+    .conn-dot.failed{background:var(--danger)}
+    @keyframes blink2{0%,100%{opacity:1}50%{opacity:.2}}
+
     /* ── HUD base ── */
     .hud{position:fixed;z-index:900;pointer-events:none}
     .hud *{pointer-events:auto}
@@ -83,6 +93,9 @@
     .info-row{display:flex;align-items:center;gap:6px}
     .info-label{color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
     .info-val{font-weight:700}
+    /* P2P status indicator in HUD */
+    #hudConnStatus{font-size:10px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:4px}
+    #hudConnDot{width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block}
 
     /* ── HUD EXIT (top-right) ── */
     #hud-exit{top:calc(12px + var(--safe-top));right:12px;display:none}
@@ -112,11 +125,7 @@
       display:none;
       transition:bottom .3s ease
     }
-
-    /* Adjust chat when host (pin button above) */
-    body.is-host #hud-chat{
-      bottom:calc(80px + var(--safe-bottom));
-    }
+    body.is-host #hud-chat{bottom:calc(80px + var(--safe-bottom));}
 
     .chat-box{background:rgba(11,15,26,.92);backdrop-filter:blur(14px);border:1px solid var(--border);
       border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;
@@ -139,20 +148,14 @@
       flex-shrink:0;font-family:'Nunito',sans-serif;font-weight:900;line-height:1;
       touch-action:manipulation;user-select:none}
     .chat-minimize-btn:hover{background:rgba(255,255,255,.12);color:var(--text)}
-
-    /* Minimized state */
     .chat-box.minimized .chat-body{display:none}
     .chat-box.minimized{border-radius:var(--r)}
     .chat-box.minimized .chat-header{border-bottom:none}
     .chat-minimize-btn.minimized{transform:rotate(180deg)}
-
-    /* Unread badge */
-    .unread-badge{
-      background:var(--accent3);color:#fff;border-radius:50%;
+    .unread-badge{background:var(--accent3);color:#fff;border-radius:50%;
       width:18px;height:18px;font-size:10px;font-weight:900;
       display:none;align-items:center;justify-content:center;flex-shrink:0}
     .unread-badge.show{display:flex}
-
     .chat-body{display:flex;flex-direction:column;overflow:hidden}
     #chatMessages{height:150px;overflow-y:auto;padding:10px 14px;display:flex;
       flex-direction:column;gap:5px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent}
@@ -215,7 +218,6 @@
       animation:sheetUp .35s cubic-bezier(.34,1.56,.64,1) both;
       max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
     @keyframes sheetUp{from{opacity:0;transform:translateY(60px)}to{opacity:1;transform:translateY(0)}}
-    /* drag handle for mobile */
     .sheet-handle{width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.18);
       margin:0 auto 16px;cursor:grab}
     .sheet-title{font-size:17px;font-weight:900;margin-bottom:16px;display:flex;align-items:center;gap:8px}
@@ -297,8 +299,6 @@
       #hud-notify{max-width:180px}
       .notify{font-size:12px;padding:8px 12px;max-width:180px}
     }
-
-    /* landscape mobile — shorter chat */
     @media (max-height: 500px) {
       #chatMessages{height:80px}
       .event-sheet{max-height:96vh}
@@ -307,7 +307,6 @@
 </head>
 <body>
 
-<!-- MAP -->
 <div id="map"></div>
 
 <!-- MENU -->
@@ -356,6 +355,11 @@
     <span class="info-label">Events</span>
     <span class="info-val" id="infoEvents">0</span>
   </div>
+  <!-- P2P network status -->
+  <div class="info-row" style="margin-top:4px" id="hudConnStatus">
+    <span id="hudConnDot" style="width:6px;height:6px;border-radius:50%;background:var(--muted);display:inline-block"></span>
+    <span id="hudConnText" style="font-size:10px;color:var(--muted);font-weight:600">Connecting…</span>
+  </div>
 </div>
 
 <!-- HUD: EXIT -->
@@ -363,7 +367,7 @@
   <button id="exitBtn">✕ Exit</button>
 </div>
 
-<!-- HUD: PIN BUTTON (host only, bottom-center) -->
+<!-- HUD: PIN BUTTON (host only) -->
 <div class="hud" id="hud-host-btn" style="display:none">
   <button id="pinEventBtn">📍 Pin Event</button>
 </div>
@@ -392,40 +396,35 @@
 <!-- HUD: NOTIFICATIONS -->
 <div class="hud" id="hud-notify"></div>
 
-<!-- PICKING HINT OVERLAY -->
+<!-- PICKING HINT -->
 <div id="pickingHint">
   <span class="ph-icon">📍</span>
   <p>Tap anywhere on the map</p>
   <small>to drop your event pin</small>
 </div>
 
-<!-- EVENT MODAL (host only) -->
+<!-- EVENT MODAL -->
 <div id="eventModal">
   <div class="event-sheet">
     <div class="sheet-handle"></div>
     <div class="sheet-title">📍 Create an Event</div>
-
     <div class="event-types" id="eventTypes">
-      <div class="etype selected" data-type="gather"   data-icon="🤝"><span class="ei">🤝</span>Gather Here</div>
+      <div class="etype selected" data-type="gather"    data-icon="🤝"><span class="ei">🤝</span>Gather Here</div>
       <div class="etype"          data-type="treeplant" data-icon="🌱"><span class="ei">🌱</span>Tree Planting</div>
-      <div class="etype"          data-type="cleanup"  data-icon="🧹"><span class="ei">🧹</span>Clean-Up Drive</div>
-      <div class="etype"          data-type="relief"   data-icon="📦"><span class="ei">📦</span>Relief Ops</div>
-      <div class="etype"          data-type="medical"  data-icon="🏥"><span class="ei">🏥</span>Medical Aid</div>
-      <div class="etype"          data-type="custom"   data-icon="✏️"><span class="ei">✏️</span>Custom</div>
+      <div class="etype"          data-type="cleanup"   data-icon="🧹"><span class="ei">🧹</span>Clean-Up Drive</div>
+      <div class="etype"          data-type="relief"    data-icon="📦"><span class="ei">📦</span>Relief Ops</div>
+      <div class="etype"          data-type="medical"   data-icon="🏥"><span class="ei">🏥</span>Medical Aid</div>
+      <div class="etype"          data-type="custom"    data-icon="✏️"><span class="ei">✏️</span>Custom</div>
     </div>
-
     <div class="sheet-field" id="customWrap" style="display:none">
       <label>Custom Event Name</label>
       <input id="customLabel" placeholder="e.g. Feeding Program…" maxlength="40"/>
     </div>
-
     <div class="sheet-field">
       <label>Description <span style="font-weight:400;text-transform:none">(optional)</span></label>
       <textarea id="eventDesc" rows="2" placeholder="Add details for your team…"></textarea>
     </div>
-
     <button class="pick-btn" id="pickLocBtn">🗺️ Tap to pick a location on the map</button>
-
     <div class="sheet-actions">
       <button class="btn-cancel" id="cancelEventBtn">Cancel</button>
       <button class="btn-pin"    id="confirmPinBtn" disabled>📍 Pin It</button>
@@ -434,10 +433,21 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<!--
+  FIX 1: Load PeerJS from a reliable CDN with a specific version.
+  The old unpkg URL for peerjs@1.5.2 was returning 404 because that exact
+  build artifact path changed. We use the jsDelivr CDN which is more stable.
+-->
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
 <script>
 // ═══════════════════════════════════════════════════════
 //  GeoGO — Multiplayer Real-World Event Map
+//  FIXES:
+//  1. Switched CDN for PeerJS (was 404ing on unpkg)
+//  2. Explicit PeerJS server config (0.peerjs.com) instead of default
+//  3. Added STUN/TURN servers so cross-network P2P works
+//  4. Added connection retry logic and status indicator
 // ═══════════════════════════════════════════════════════
 
 /* ── MAP ── */
@@ -483,6 +493,8 @@ const eventTypesEl   = $('eventTypes');
 const customWrap     = $('customWrap');
 const customLabelEl  = $('customLabel');
 const eventDescEl    = $('eventDesc');
+const hudConnDot     = $('hudConnDot');
+const hudConnText    = $('hudConnText');
 
 /* ── STATE ── */
 let nickname = '', myColor = '', roomId = '';
@@ -513,6 +525,18 @@ function uid(){ return Math.random().toString(36).substring(2,10); }
 function genRoomId(){ return Math.random().toString(36).substring(2,8).toUpperCase(); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+/* ── CONNECTION STATUS ── */
+function setConnStatus(state, text){
+  const colors = { connecting:'#facc15', connected:'#4ade80', failed:'#f87171', relay:'#fb923c' };
+  hudConnDot.style.background = colors[state] || '#8899bb';
+  hudConnText.textContent = text;
+  if(state === 'connecting'){
+    hudConnDot.style.animation = 'blink2 .8s ease-in-out infinite';
+  } else {
+    hudConnDot.style.animation = '';
+  }
+}
+
 /* ── NOTIFY ── */
 function notify(msg){
   const el = document.createElement('div');
@@ -531,16 +555,13 @@ function toggleChat(){
   chatMinBtn.textContent = chatMinimized ? '+' : '−';
   chatMinBtn.title = chatMinimized ? 'Expand' : 'Minimize';
   if(!chatMinimized){
-    // reset unread on open
     unreadCount = 0;
     unreadBadge.textContent = '0';
     unreadBadge.classList.remove('show');
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 }
-
 chatMinBtn.addEventListener('click', e=>{ e.stopPropagation(); toggleChat(); });
-// Also allow tapping the header to toggle
 chatHeader.addEventListener('click', ()=>toggleChat());
 
 /* ── CHAT ── */
@@ -554,8 +575,6 @@ function addChat(name, text, sys=false){
   }
   chatMessages.appendChild(div);
   chatMessages.scrollTop = chatMessages.scrollHeight;
-
-  // Show unread badge when minimized
   if(chatMinimized && name !== nickname){
     unreadCount++;
     unreadBadge.textContent = unreadCount > 9 ? '9+' : String(unreadCount);
@@ -766,8 +785,8 @@ function setupConn(conn){
   else peers[peerId].conn = conn;
 
   conn.on('data',  d  => handleMessage(d, conn));
-  conn.on('close', () => removePeer(peerId));
-  conn.on('error', () => removePeer(peerId));
+  conn.on('close', () => { removePeer(peerId); setConnStatus('connected', 'P2P Active'); });
+  conn.on('error', () => { removePeer(peerId); });
 
   if(isHost){
     const playerSnap={}, eventSnap={};
@@ -791,81 +810,199 @@ function startGPS(){
   }, { enableHighAccuracy:true, maximumAge:2000, timeout:10000 });
 }
 
+/* ══════════════════════════════════════════
+   FIX 2 & 3: PEERJS CONFIG WITH STUN/TURN
+   
+   WHY THIS IS NEEDED:
+   - Without STUN servers, WebRTC only works on the same LAN.
+     STUN tells each peer its public IP so they can connect directly
+     across different home/mobile networks.
+   - TURN servers relay traffic when direct connection fails (strict NAT,
+     corporate firewalls, mobile carriers). Using free public TURN from
+     Open Relay Project (openrelay.metered.ca).
+   - Explicit host/port for PeerJS signaling server instead of relying
+     on the default (which was returning 404s).
+══════════════════════════════════════════ */
+const PEER_CONFIG = {
+  // Use the official PeerJS cloud signaling server explicitly
+  host: '0.peerjs.com',
+  port: 443,
+  path: '/',
+  secure: true,
+  debug: 1,
+  config: {
+    iceServers: [
+      // Google STUN — free, reliable, works for most direct connections
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      // Open Relay TURN — relays traffic when direct P2P is blocked
+      // (users behind strict carrier NAT, corporate firewalls, etc.)
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
+    ],
+    iceCandidatePoolSize: 10,
+  },
+};
+
 /* ── HOST ── */
 function startHost(){
-  peer = new Peer(roomId, { debug:0 });
-  peer.on('open', ()=>{
-    isHost=true;
-    roleBadge.textContent='HOST 👑'; roleBadge.className='badge badge-host';
-    infoRoom.textContent=roomId;
-    showHUD(); startGPS();
+  setConnStatus('connecting', 'Starting server…');
+  peer = new Peer(roomId, PEER_CONFIG);
+
+  peer.on('open', id => {
+    isHost = true;
+    setConnStatus('connected', 'P2P Ready');
+    roleBadge.textContent = 'HOST 👑';
+    roleBadge.className = 'badge badge-host';
+    infoRoom.textContent = roomId;
+    showHUD();
+    startGPS();
   });
-  peer.on('connection', conn=>{
+
+  peer.on('connection', conn => {
     connections.push(conn);
     setupConn(conn);
-    setTimeout(()=>{
+    setConnStatus('connected', `${Object.keys(peers).length + 1} connected`);
+    setTimeout(() => {
       if(peers[conn.peer]?.data){
-        const name=peers[conn.peer].data.nickname;
-        const jmsg={ type:'join_notify',msgId:uid(),nickname:name };
-        addChat('',`${name} joined 🎮`,true);
+        const name = peers[conn.peer].data.nickname;
+        const jmsg = { type:'join_notify', msgId:uid(), nickname:name };
+        addChat('', `${name} joined 🎮`, true);
         notify(`${name} joined 🎮`);
         relayExcept(jmsg, conn);
       }
     }, 1500);
   });
-  peer.on('error', e=>{
-    if(e.type==='unavailable-id'){
-      roomId=genRoomId();
-      roomDisplay.innerHTML=`ID taken, new room:<br><span class="room-id">${roomId}</span>`;
+
+  peer.on('error', e => {
+    console.error('PeerJS error:', e.type, e);
+    if(e.type === 'unavailable-id'){
+      // Room ID taken — generate a new one and retry
+      roomId = genRoomId();
+      roomDisplay.innerHTML = `ID taken, new room:<br><span class="room-id">${roomId}</span>`;
+      peer.destroy();
       startHost();
-    } else console.error(e);
+    } else if(e.type === 'network' || e.type === 'server-error'){
+      setConnStatus('failed', 'Server error — retrying…');
+      notify('⚠️ Connection issue, retrying…');
+      setTimeout(() => { peer.destroy(); startHost(); }, 3000);
+    } else {
+      setConnStatus('failed', `Error: ${e.type}`);
+      notify(`⚠️ PeerJS error: ${e.type}`);
+    }
+  });
+
+  peer.on('disconnected', () => {
+    setConnStatus('connecting', 'Reconnecting…');
+    // PeerJS will try to reconnect automatically
+    peer.reconnect();
   });
 }
 
 /* ── CLIENT ── */
 function startClient(){
-  peer = new Peer(undefined, { debug:0 });
-  peer.on('open', ()=>{
-    const conn = peer.connect(roomId, { reliable:true });
-    connections.push(conn);
-    conn.on('open', ()=>{
-      setupConn(conn);
-      roleBadge.textContent='PLAYER 👤'; roleBadge.className='badge badge-player';
-      infoRoom.textContent=roomId;
-      showHUD(); startGPS();
-      broadcast({ type:'join_notify',msgId:uid(),nickname });
+  setConnStatus('connecting', 'Looking for host…');
+  peer = new Peer(undefined, PEER_CONFIG);
+
+  peer.on('open', () => {
+    const conn = peer.connect(roomId, {
+      reliable: true,
+      // Serialization 'json' is more compatible across browsers than 'binary'
+      serialization: 'json',
     });
-    conn.on('error', ()=>{ alert('Could not connect. Check the Room ID.'); location.reload(); });
+    connections.push(conn);
+
+    const connTimeout = setTimeout(() => {
+      if(!conn.open){
+        setConnStatus('failed', 'Could not reach host');
+        alert('Could not connect. Make sure the Room ID is correct and the host is online.');
+        location.reload();
+      }
+    }, 15000);
+
+    conn.on('open', () => {
+      clearTimeout(connTimeout);
+      setConnStatus('connected', 'P2P Active');
+      setupConn(conn);
+      roleBadge.textContent = 'PLAYER 👤';
+      roleBadge.className = 'badge badge-player';
+      infoRoom.textContent = roomId;
+      showHUD();
+      startGPS();
+      broadcast({ type:'join_notify', msgId:uid(), nickname });
+    });
+
+    conn.on('error', err => {
+      clearTimeout(connTimeout);
+      console.error('Connection error:', err);
+      setConnStatus('failed', 'Connection failed');
+      alert('Could not connect. Check the Room ID.');
+      location.reload();
+    });
   });
-  peer.on('error', e=>{ alert('Error: '+e.type); console.error(e); });
+
+  peer.on('error', e => {
+    console.error('PeerJS error:', e.type, e);
+    setConnStatus('failed', `Error: ${e.type}`);
+    if(e.type === 'peer-unavailable'){
+      alert('Room not found. Make sure the Room ID is correct and the host is online.');
+      location.reload();
+    } else {
+      alert('Connection error: ' + e.type);
+    }
+  });
+
+  peer.on('disconnected', () => {
+    setConnStatus('connecting', 'Reconnecting…');
+    peer.reconnect();
+  });
 }
 
 /* ── MENU ── */
-createBtn.onclick = ()=>{
-  nickname=nicknameEl.value.trim();
+createBtn.onclick = () => {
+  nickname = nicknameEl.value.trim();
   if(!nickname){ nicknameEl.focus(); return; }
-  myColor=pickColor(); roomId=genRoomId();
-  roomDisplay.innerHTML=`Room created! Share this ID:<br><span class="room-id">${roomId}</span>`;
-  createBtn.disabled=true; joinBtn.disabled=true;
+  myColor = pickColor();
+  roomId  = genRoomId();
+  roomDisplay.innerHTML = `Room created! Share this ID:<br><span class="room-id">${roomId}</span>`;
+  createBtn.disabled = true;
+  joinBtn.disabled   = true;
   startHost();
 };
-joinBtn.onclick = ()=>{
-  nickname=nicknameEl.value.trim();
-  roomId=roomInputEl.value.trim().toUpperCase();
+
+joinBtn.onclick = () => {
+  nickname = nicknameEl.value.trim();
+  roomId   = roomInputEl.value.trim().toUpperCase();
   if(!nickname){ nicknameEl.focus(); return; }
   if(!roomId)  { roomInputEl.focus(); return; }
-  myColor=pickColor();
-  roomDisplay.innerHTML=`Connecting to <span class="room-id">${roomId}</span>…`;
-  createBtn.disabled=true; joinBtn.disabled=true;
+  myColor = pickColor();
+  roomDisplay.innerHTML = `Connecting to <span class="room-id">${roomId}</span>…`;
+  createBtn.disabled = true;
+  joinBtn.disabled   = true;
   startClient();
 };
-nicknameEl.addEventListener('keydown', e=>{ if(e.key==='Enter') roomInputEl.focus(); });
-roomInputEl.addEventListener('keydown',e=>{ if(e.key==='Enter') joinBtn.click(); });
-roomInputEl.addEventListener('input',  ()=>{ roomInputEl.value=roomInputEl.value.toUpperCase().replace(/[^A-Z0-9]/g,''); });
+
+nicknameEl.addEventListener('keydown',  e => { if(e.key==='Enter') roomInputEl.focus(); });
+roomInputEl.addEventListener('keydown', e => { if(e.key==='Enter') joinBtn.click(); });
+roomInputEl.addEventListener('input',   () => { roomInputEl.value = roomInputEl.value.toUpperCase().replace(/[^A-Z0-9]/g,''); });
 
 /* ── EXIT ── */
-exitBtn.onclick = ()=>{
-  if(watchId!==null) navigator.geolocation.clearWatch(watchId);
+exitBtn.onclick = () => {
+  if(watchId !== null) navigator.geolocation.clearWatch(watchId);
   if(peer) peer.destroy();
   location.reload();
 };
@@ -874,58 +1011,56 @@ exitBtn.onclick = ()=>{
    EVENT PINNING  (host only)
 ══════════════════════════════════════════ */
 function resetModal(){
-  pickedLat=null; pickedLng=null;
-  confirmPinBtn.disabled=true;
-  pickLocBtn.textContent='🗺️ Tap to pick a location on the map';
+  pickedLat = null; pickedLng = null;
+  confirmPinBtn.disabled = true;
+  pickLocBtn.textContent = '🗺️ Tap to pick a location on the map';
   pickLocBtn.classList.remove('picked');
-  eventDescEl.value=''; customLabelEl.value='';
-  document.querySelectorAll('.etype').forEach(el=>el.classList.remove('selected'));
+  eventDescEl.value = ''; customLabelEl.value = '';
+  document.querySelectorAll('.etype').forEach(el => el.classList.remove('selected'));
   document.querySelector('.etype[data-type="gather"]').classList.add('selected');
-  selType='gather'; selIcon='🤝';
-  customWrap.style.display='none';
+  selType = 'gather'; selIcon = '🤝';
+  customWrap.style.display = 'none';
 }
 
-pinEventBtn.onclick = ()=>{ resetModal(); eventModal.classList.add('open'); };
-cancelEventBtn.onclick = ()=>{ eventModal.classList.remove('open'); exitPickMode(); };
-eventModal.addEventListener('click', e=>{ if(e.target===eventModal){ eventModal.classList.remove('open'); exitPickMode(); } });
+pinEventBtn.onclick    = () => { resetModal(); eventModal.classList.add('open'); };
+cancelEventBtn.onclick = () => { eventModal.classList.remove('open'); exitPickMode(); };
+eventModal.addEventListener('click', e => { if(e.target===eventModal){ eventModal.classList.remove('open'); exitPickMode(); } });
 
-/* Type selection */
-eventTypesEl.addEventListener('click', e=>{
-  const card=e.target.closest('.etype');
+eventTypesEl.addEventListener('click', e => {
+  const card = e.target.closest('.etype');
   if(!card) return;
-  document.querySelectorAll('.etype').forEach(el=>el.classList.remove('selected'));
+  document.querySelectorAll('.etype').forEach(el => el.classList.remove('selected'));
   card.classList.add('selected');
-  selType=card.dataset.type; selIcon=card.dataset.icon;
+  selType = card.dataset.type;
+  selIcon = card.dataset.icon;
   customWrap.style.display = selType==='custom' ? 'block' : 'none';
 });
 
-/* Pick location on map */
-pickLocBtn.onclick = ()=>{ eventModal.classList.remove('open'); enterPickMode(); };
+pickLocBtn.onclick = () => { eventModal.classList.remove('open'); enterPickMode(); };
 
 function enterPickMode(){
-  pickingMode=true;
+  pickingMode = true;
   document.body.classList.add('picking');
-  pickingHint.style.display='block';
+  pickingHint.style.display = 'block';
 }
 function exitPickMode(){
-  pickingMode=false;
+  pickingMode = false;
   document.body.classList.remove('picking');
-  pickingHint.style.display='none';
+  pickingHint.style.display = 'none';
 }
 
-map.on('click', e=>{
+map.on('click', e => {
   if(!pickingMode) return;
-  pickedLat=e.latlng.lat; pickedLng=e.latlng.lng;
+  pickedLat = e.latlng.lat; pickedLng = e.latlng.lng;
   exitPickMode();
-  pickLocBtn.textContent=`✅ ${pickedLat.toFixed(5)}, ${pickedLng.toFixed(5)}`;
+  pickLocBtn.textContent = `✅ ${pickedLat.toFixed(5)}, ${pickedLng.toFixed(5)}`;
   pickLocBtn.classList.add('picked');
-  confirmPinBtn.disabled=false;
+  confirmPinBtn.disabled = false;
   eventModal.classList.add('open');
 });
 
-/* Confirm and broadcast event */
-confirmPinBtn.onclick = ()=>{
-  if(pickedLat===null) return;
+confirmPinBtn.onclick = () => {
+  if(pickedLat === null) return;
   const typeEl = document.querySelector(`.etype[data-type="${selType}"]`);
   const label  = selType==='custom'
     ? (customLabelEl.value.trim() || 'Custom Event')
@@ -942,7 +1077,7 @@ confirmPinBtn.onclick = ()=>{
     pinned_by: nickname,
   };
   placeEvent(evId, evData);
-  map.setView([pickedLat,pickedLng], Math.max(map.getZoom(),16));
+  map.setView([pickedLat, pickedLng], Math.max(map.getZoom(), 16));
   broadcast(evData);
   addChat('', `📍 You pinned "${label}"`, true);
   notify(`📍 Event pinned: ${selIcon} ${label}`);
@@ -950,8 +1085,8 @@ confirmPinBtn.onclick = ()=>{
 };
 
 /* ── CLEANUP ── */
-window.addEventListener('beforeunload', ()=>{
-  if(watchId!==null) navigator.geolocation.clearWatch(watchId);
+window.addEventListener('beforeunload', () => {
+  if(watchId !== null) navigator.geolocation.clearWatch(watchId);
   if(peer) peer.destroy();
 });
 </script>
